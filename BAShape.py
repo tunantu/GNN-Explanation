@@ -1,3 +1,17 @@
+"""
+This code describes the explanation for a simple GCN model using GNNExplainer algorithm over BAShapes dataset.
+
+We first train the simple GCN model and recode its results.
+
+After that, we explain this model and evaluate it using two metrics. In the description about BAShape dataset:
+
+Ground-truth node-level and edge-level explainabilty masks are given based on whether nodes and edges are part of a certain motif or not.
+
+But so far I just figured out the comparison between ground-truth edge mask and prediction edge mask. I will try to finish another one.
+
+And We record  the results behind.
+"""
+
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score
@@ -73,6 +87,11 @@ for epoch in pbar:
 pbar.close()
 model.eval()
 
+'''
+The results for this simple GCN model:
+Loss: 0.6302, Train: 0.8571, Test: 0.8500
+'''
+
 for explanation_type in ['phenomenon', 'model']:
     explainer = Explainer(
         model=model,
@@ -87,11 +106,13 @@ for explanation_type in ['phenomenon', 'model']:
         ),
     )
 
-    # Explanation ROC AUC over all test nodes:
-    targets, preds = [], []
+    # Explanation ACC and roauc over all test nodes:
+    node_targets, node_preds = [], [] # haven't been finished.
+    edge_targets, edge_preds = [], []
+
 
     '''
-    In the BAShape dataset, nodes are of type 0 on the basi graph, and there are 300 nodes in the basic graph. 
+    In the BAShape dataset, nodes are of type 0 on the base graph, and there are 300 nodes in the basic graph. 
     We are focusing on explaining the "house", so the starting node is chosen as 300. 
     Since each house has 5 nodes, the interval is 5. 
     By explaining the first node of each house, we can explain all 80 houses.
@@ -113,11 +134,29 @@ for explanation_type in ['phenomenon', 'model']:
         _, _, _, hard_edge_mask = k_hop_subgraph(node_index, num_hops=3,
                                                  edge_index=data.edge_index)
         
-        targets.append(data.edge_mask[hard_edge_mask].cpu())
-        preds.append(explanation.edge_mask[hard_edge_mask].cpu())
+        edge_targets.append(data.edge_mask[hard_edge_mask].cpu())
+        edge_preds.append(explanation.edge_mask[hard_edge_mask].cpu())
+
+
+
+
 
     """
     https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/explain/metric/basic.html#groundtruth_metrics
     """
-    acc = groundtruth_metrics(torch.cat(preds), torch.cat(targets), 'accuracy')
+    acc = groundtruth_metrics(torch.cat(edge_preds), torch.cat(edge_targets), 'accuracy')
     print(f'acc (explanation type {explanation_type:10}): {acc:.4f}')
+
+    auroc = groundtruth_metrics(torch.cat(edge_preds), torch.cat(edge_targets), 'auroc')
+    print(f'auroc (explanation type {explanation_type:10}): {auroc:.4f}')
+
+'''
+results for acc:
+phenomenon: 0.9814
+model: 0.9814
+
+results for auroc:
+phenomenon: 0.9834
+model: 0.9831
+
+'''
